@@ -1,0 +1,44 @@
+---
+title: "How protected is Boston from the Government shutdown"
+output: html_notebook
+---
+
+
+Today marks the {nth day} day of the [partial] government shutdown. This has been the longest government shutdown in the history of the United States. The effects of the shutsdown are widespread and touch the lives of both public servants and private citizens.
+
+The news has been filled with stories about TSA agents working without pay, the infamous (though quite rare) "sick outs", exceptionally long wait times for security at US airports, and delays. Members of the Federal Aviation A(??)'s Air Traffic Control have been thinking of unionizing for a long while—an idea that President Trump is historically in favor of. Indeed searches by employees of the IRS have been up by 30%. Even private citizens who work indiriectly for the US government (federal contractors etc.) via "non-essential" agencies are not able to work. Perhaps a message that can be taken away from the shutdown is about the importance of private organizations. However, that is a topic for another day. 
+
+As the Boston Area Research Initiave (BARI), we are concerned with the wellbeing of those within the Greater Boston area. And as such, we intend to look the effects of the shutdown on the area's residents. How resilient is the area to a government shutdown? How affected are our residents? To begin answering this question, we must understand the some demographics of the Boston Area's residents. 
+
+Resident's of Boston have a reasonably 
+
+- FAA air traffic controllers has been wanting to privatize for a while this is another great incentive, trump set a precendent for that in feb 12, 2018. This might be another effort
+- TSA agents are working without pay
+- Indeed job searches from IRS employees are up 30% on indeed
+- private consultants for "Non-essential government agencies" are not able to work
+
+
+- thought: the government shutdown is an implicit advocate for privatisation of public programs. is this something that trump means to do.
+
+I want to say that this shutdown is also a subtle message about the need to privatize federal goods, but that would be giving trump too much credit. It's about racism
+
+
+Idea:
+government shutdown is the longest in history. how resilient is the boston area to a government shutdown? In order to address this 
+
+
+- what is the income distribution of the boston area
+- what is the distribution of federal empployees of the area
+- what is the distribution of public assistance
+
+What areas have the most federal employees? 
+  - the average median income for those people?
+  
+  
+```{r}
+x %>% 
+  filter(fed_q == 5) %>% 
+  summarise(median(med_hh_inc, na.rm = TRUE),
+            mean(med_hh_inc, na.rm = TRUE))
+```
+

@@ -1,26 +1,174 @@
 ---
-title: "How protected is Boston from the Government shutdown"
+title: "Boston's Resilience to Government Shutdown"
 output: html_notebook
 ---
 
 
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+library(sf)
+library(tidyverse)
+library(tidycensus)
+
+
+
+
+
+pal <- c("#281823", "#553040", "#8A4A59", "#C2666C", "#F88778")
+
+# Create ACS data
+acs <- get_acs(geography = "tract",
+        survey = "acs5",
+        state = "ma",
+        year = 2016,
+        output = "wide",
+        variables = c("B24080_009", # Males federally employed
+                      "B24080_018", # Females federally employed
+                      "B19057_002", # households with public assistance
+                      "B19057_001", # total households
+                      "B23025_003", # Employed age 16 +
+                      "B19013_001"), # Median hh-income,
+        geometry = TRUE) %>%
+  mutate(fed_emp = B24080_009E + B24080_018E,
+         total_emp = B23025_003E,
+         pub_assist = B19057_002E / B19057_001E,
+         prop_fed_emp = fed_emp / total_emp,
+         med_hh_inc = B19013_001E) %>%
+  select(geoid = GEOID, name = NAME, fed_emp, total_emp, pub_assist, prop_fed_emp,
+         med_hh_inc) %>%
+  mutate(pub_q = ntile(pub_assist, 5),
+         fed_q = ntile(prop_fed_emp, 5),
+         inc_q = ntile(med_hh_inc, 5),
+         color = atan(fed_q/pub_q),
+         alpha = fed_q + pub_q,
+         at_risk = ifelse(fed_q == 5 & (pub_q %in% 4:5), 1, 0),
+         risk_cat = case_when(
+           fed_q == 5 & (pub_q %in% 4:5) ~ 3,
+           fed_q == 4 & pub_q == 3 ~ 2,
+           fed_q == 3 & pub_q <=3 ~ 1,
+           TRUE ~ 1
+         )) %>%
+  separate(name, into = c("tract", "county", "state"), sep = ",") %>%
+  filter(str_detect(county, "Suffolk"))
+```
+
+
 Today marks the {nth day} day of the [partial] government shutdown. This has been the longest government shutdown in the history of the United States. The effects of the shutsdown are widespread and touch the lives of both public servants and private citizens.
 
-The news has been filled with stories about TSA agents working without pay, the infamous (though quite rare) "sick outs", exceptionally long wait times for security at US airports, and delays. Members of the Federal Aviation A(??)'s Air Traffic Control have been thinking of unionizing for a long while—an idea that President Trump is historically in favor of. Indeed searches by employees of the IRS have been up by 30%. Even private citizens who work indiriectly for the US government (federal contractors etc.) via "non-essential" agencies are not able to work. Perhaps a message that can be taken away from the shutdown is about the importance of private organizations. However, that is a topic for another day. 
+The news has been filled with stories about TSA agents working without pay, the infamous (though quite rare) "sick outs", exceptionally long wait times for security at US airports, and delays. Members of the Federal Aviation A(??)'s Air Traffic Control have been thinking of unionizing for a long while—an idea that President Trump is historically in favor of. Indeed searches by employees of the [IRS have been up by 30%](https://twitter.com/marthagimbel/status/1085950274995404802). Even private citizens who work indiriectly for the US government (federal contractors etc.) via "non-essential" agencies are not able to work. Perhaps a message that can be taken away from the shutdown is about the importance of private organizations. However, that is a topic for another day. 
 
 As the Boston Area Research Initiave (BARI), we are concerned with the wellbeing of those within the Greater Boston area. And as such, we intend to look the effects of the shutdown on the area's residents. How resilient is the area to a government shutdown? How affected are our residents? To begin answering this question, we must understand the some demographics of the Boston Area's residents. 
 
-Resident's of Boston have a reasonably 
+Resident's of Boston have median income (\$62k) slighly higher than the national estimate (\$60k), but also have more people in poverty (20.5%) than the US as a whole (12.3%). The areas in Suffolk county with the Lowest income are places like South Boston, Jamaica Plane, Dorchester, Roxbury, Revere and Lynn.
 
-- FAA air traffic controllers has been wanting to privatize for a while this is another great incentive, trump set a precendent for that in feb 12, 2018. This might be another effort
-- TSA agents are working without pay
-- Indeed job searches from IRS employees are up 30% on indeed
-- private consultants for "Non-essential government agencies" are not able to work
+```{r}
+ggplot(acs) +
+  geom_sf(aes(fill = as.factor(inc_q)), lwd = 0) +
+  theme_minimal() +
+  labs(title = "Household Income", subtitle =  "Past 12 Months (Suffolk County)",
+       caption = "Median income as quintiles.") +
+  scale_fill_manual(values = (pal))
+
+```
+
+Of the areas with the lowest incomes, only those nearest to Roxbury and Dorcester are in the highest quintile 20% of public assistance recipients—though public assistance use is still relatively low with maximum of 16% of households in census tract. 
+
+Fortunately, food assistance programs aren't gone along with TSA paychecks. These areas with more use of public assistance, though still experiencing poverty, the effects [hopefully] will not be exasterbated much by the absence of paychecks. 
 
 
-- thought: the government shutdown is an implicit advocate for privatisation of public programs. is this something that trump means to do.
+```{r}
+acs %>% 
+  filter(inc_q %in% 1, 
+         pub_q %in% 1) %>% 
+  as_tibble() %>% 
+  select(tract, med_hh_inc, inc_q, pub_assist, pub_q, prop_fed_emp, fed_q) %>% 
+  mutate_if(is.double, round, 3)
 
-I want to say that this shutdown is also a subtle message about the need to privatize federal goods, but that would be giving trump too much credit. It's about racism
+```
+
+There are only 7 census tracts in the Suffolk county at both the lowest 20% of income and lowest 20% of public assistance. These are the areas that can be considered _at risk_. If families in these tracts have their income stream cut-off, they have little to no access to cash that can be used for life's basic necessities. 
+
+```{r}
+acs %>% 
+  select(inc_q, pub_assist) %>% 
+  group_by(inc_q) %>% 
+  summarise_if(is.numeric, funs(min = min, avg = mean, max = max)) %>% 
+  ungroup() %>% 
+  st_set_geometry(NULL) %>% 
+  filter(inc_q %in% 1:5) %>% 
+  mutate_all(funs(round(., 3))) %>% 
+  mutate(inc_q = glue::glue("{inc_q * 20}%")) %>% 
+  mutate_at(vars(min, avg, max), ~.*100)
+```
+
+But, the question still remains to be answered. How resilient is Boston to government shutdown? So far, the answer seems to be _somewhat_. In each income quintile, fewer than 5% of households receive some sort of income assistance. However, what percent of Bostononians are actually federal government workers that are at risk of having their income cut?
+
+
+```{r}
+acs %>%
+  filter(!is.na(prop_fed_emp),
+         geoid != 25025981202) %>% 
+  #mapview(zcol = "prop_fed_emp")
+  ggplot(aes(fill = prop_fed_emp)) +
+  geom_sf(lwd = 0) +
+  theme_minimal() +
+  scale_fill_continuous(low = "#3E3448", high = "#F58673",
+                        labels = scales::percent_format()) +
+  labs(title = "Federal Employment",
+       caption = "% of workers employed\nby federal government")
+```
+
+```{r}
+ 
+fed_work <- acs %>%
+  filter(!is.na(prop_fed_emp),
+         geoid != 25025981202) %>%
+  mutate(fed_q = ntile(prop_fed_emp, 5))
+
+fed_work %>%
+  group_by(inc_q, fed_q) %>%
+  filter(!is.na(inc_q)) %>% 
+  summarise_at(.vars =vars(med_hh_inc),
+               .funs = list(min = ~min(., na.rm = TRUE),
+                            max = ~max(., na.rm = TRUE),
+                            med = ~median(., na.rm = TRUE),
+                            avg = ~mean(., na.rm = TRUE),
+                    n = length)) %>%
+  mutate_all(round, 3)
+#   gather(var, val, -fed_q)
+
+```
+
+
+The answer is _not many_. The most recent ACS estimates that onl 2.5% percent of Suffolk County residents are employed by the Federal Government. Fortunately, the shutdown has little affect on the city of Boston. The only heartwrenching change to the city is that the gates to the JFK Library are [closed](https://www.bostonmagazine.com/news/2019/01/02/whats-open-and-whats-closed-in-boston-during-the-shutdown/). As stories of [long lines](https://www.npr.org/2019/01/13/684824384/as-shutdown-continues-thousands-of-federal-workers-visit-d-c-area-pop-up-food-ba) for food banks in Washington DC, where 10% of the population is employed by the Federal government, the economic resilience of the city becomes evermore apparent. 
+
+
+
+
+
+
+
+
+-----------
+
+##### notes
+
+
+
+
+```{r}
+acs %>% 
+  ggplot(aes(med_hh_inc)) +
+  geom_histogram(bins = 20,
+                 fill = "grey") +
+  theme_minimal() +
+  geom_vline(xintercept = 62021,
+             lty = 2, alpha = .55) + 
+  scale_x_continuous(labels = scales::dollar_format()) +
+  labs(title = "Median Household Income",
+       caption = "ACS 2013-'18\nDashed vertical line indicates\nmedian household income.",
+       x = "", y = "") +
+  theme(axis.text.y = element_blank())
+```
 
 
 Idea:
@@ -33,12 +181,16 @@ government shutdown is the longest in history. how resilient is the boston area 
 
 What areas have the most federal employees? 
   - the average median income for those people?
-  
-  
-```{r}
-x %>% 
-  filter(fed_q == 5) %>% 
-  summarise(median(med_hh_inc, na.rm = TRUE),
-            mean(med_hh_inc, na.rm = TRUE))
-```
+ 
+
+- FAA air traffic controllers has been wanting to privatize for a while this is another great incentive, trump set a precendent for that in feb 12, 2018. This might be another effort
+- TSA agents are working without pay
+- Indeed job searches from IRS employees are up 30% on indeed
+- private consultants for "Non-essential government agencies" are not able to work
+
+
+- thought: the government shutdown is an implicit advocate for privatisation of public programs. is this something that trump means to do. t.
+
+I want to say that this shutdown is also a subtle message about the need to privatize federal goods, but that would be giving trump too much credit. 
+
 
